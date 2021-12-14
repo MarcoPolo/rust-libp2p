@@ -657,53 +657,39 @@ impl Reservation {
         cx: &mut Context<'_>,
     ) -> Poll<Option<SubstreamProtocol<outbound_hop::Upgrade, OutboundOpenInfo>>> {
         self.forward_messages_to_transport_listener(cx);
-
-        let (mut renewal_timeout, pending_msgs, to_listener) =
-            match std::mem::replace(self, Reservation::None) {
-                Reservation::Accepted {
-                    renewal_timeout: Some(renewal_timeout),
-                    pending_msgs,
-                    to_listener,
-                } => (renewal_timeout, pending_msgs, to_listener),
-                Reservation::Accepted {
-                    renewal_timeout: None,
-                    pending_msgs,
-                    to_listener,
-                } => {
-                    *self = Reservation::Accepted {
-                        renewal_timeout: None,
+        match self {
+            Reservation::Accepted {
+                renewal_timeout: Some(renewal_timeout),
+                ..
+            } => match renewal_timeout.poll_unpin(cx) {
+                Poll::Ready(()) => {
+                    if let Reservation::Accepted {
                         pending_msgs,
                         to_listener,
-                    };
-                    return Poll::Ready(None);
+                        ..
+                    } = std::mem::replace(self, Reservation::None)
+                    {
+                        *self = Reservation::Renewing { pending_msgs };
+                        return Poll::Ready(Some(SubstreamProtocol::new(
+                            outbound_hop::Upgrade::Reserve,
+                            OutboundOpenInfo::Reserve { to_listener },
+                        )));
+                    } else {
+                        unreachable!(
+                            "We know self is Reservation::Accepted because of earlier match"
+                        );
+                    }
                 }
-                Reservation::Renewing { pending_msgs } => {
-                    *self = Reservation::Renewing { pending_msgs };
-                    return Poll::Ready(None);
-                }
-                Reservation::None => {
-                    *self = Reservation::None;
-                    return Poll::Ready(None);
-                }
-            };
-
-        if let Poll::Pending = renewal_timeout.poll_unpin(cx) {
-            *self = Reservation::Accepted {
-                renewal_timeout: Some(renewal_timeout),
-                pending_msgs,
-                to_listener,
-            };
-
-            return Poll::Pending;
-        }
-
-        // if we make it this far, we are ready for renewal
-
-        *self = Reservation::Renewing { pending_msgs };
-        return Poll::Ready(Some(SubstreamProtocol::new(
-            outbound_hop::Upgrade::Reserve,
-            OutboundOpenInfo::Reserve { to_listener },
-        )));
+                Poll::Pending => {}
+            },
+            Reservation::Accepted {
+                renewal_timeout: None,
+                ..
+            } => {}
+            Reservation::Renewing { .. } => {}
+            Reservation::None => {}
+        };
+        return Poll::Ready(None);
     }
 }
 
