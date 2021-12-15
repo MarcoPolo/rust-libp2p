@@ -657,39 +657,33 @@ impl Reservation {
         cx: &mut Context<'_>,
     ) -> Poll<Option<SubstreamProtocol<outbound_hop::Upgrade, OutboundOpenInfo>>> {
         self.forward_messages_to_transport_listener(cx);
-        match self {
+        let (next_reservation, poll_val) = match std::mem::replace(self, Reservation::None) {
             Reservation::Accepted {
-                renewal_timeout: Some(renewal_timeout),
-                ..
+                renewal_timeout: Some(mut renewal_timeout),
+                pending_msgs,
+                to_listener,
             } => match renewal_timeout.poll_unpin(cx) {
-                Poll::Ready(()) => {
-                    if let Reservation::Accepted {
+                Poll::Ready(()) => (
+                    Reservation::Renewing { pending_msgs },
+                    Poll::Ready(Some(SubstreamProtocol::new(
+                        outbound_hop::Upgrade::Reserve,
+                        OutboundOpenInfo::Reserve { to_listener },
+                    ))),
+                ),
+                Poll::Pending => (
+                    Reservation::Accepted {
+                        renewal_timeout: Some(renewal_timeout),
                         pending_msgs,
                         to_listener,
-                        ..
-                    } = std::mem::replace(self, Reservation::None)
-                    {
-                        *self = Reservation::Renewing { pending_msgs };
-                        return Poll::Ready(Some(SubstreamProtocol::new(
-                            outbound_hop::Upgrade::Reserve,
-                            OutboundOpenInfo::Reserve { to_listener },
-                        )));
-                    } else {
-                        unreachable!(
-                            "We know self is Reservation::Accepted because of earlier match"
-                        );
-                    }
-                }
-                Poll::Pending => {}
+                    },
+                    Poll::Pending,
+                ),
             },
-            Reservation::Accepted {
-                renewal_timeout: None,
-                ..
-            } => {}
-            Reservation::Renewing { .. } => {}
-            Reservation::None => {}
+            r => (r, Poll::Pending),
         };
-        return Poll::Ready(None);
+
+        *self = next_reservation;
+        poll_val
     }
 }
 
