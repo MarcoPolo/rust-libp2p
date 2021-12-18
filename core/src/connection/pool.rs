@@ -967,9 +967,15 @@ impl<THandler: IntoConnectionHandler> PendingConnection<'_, THandler> {
     }
 
     /// Aborts the connection attempt, closing the connection.
+    /// The abort command may fail to send. This is a best effort abort.
     pub fn abort(mut self) {
         if let Some(notifier) = self.entry.get_mut().abort_notifier.take() {
-            notifier.send(task::PendingConnectionCommand::Abort);
+            match notifier.send(task::PendingConnectionCommand::Abort) {
+                Ok(()) => {}
+                Err(e) => {
+                    log::debug!("Failed to pending connection: {:?}", e);
+                }
+            }
         }
     }
 }
@@ -1355,5 +1361,85 @@ impl<'a, K: 'a, V: 'a> EntryExt<'a, K, V> for hash_map::Entry<'a, K, V> {
             hash_map::Entry::Occupied(entry) => entry,
             hash_map::Entry::Vacant(_) => panic!("{}", msg),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::{
+        connection::{
+            handler::ConnectionHandlerEvent, substream::SubstreamEndpoint,
+            PendingOutboundConnectionError,
+        },
+        muxing::StreamMuxerBox,
+        transport::dummy::DummyTransport,
+    };
+    use futures::{executor::block_on, future::poll_fn};
+
+    // TestHandler satisfies the ConnectionHandler trait. If you need this for
+    // another test, consider moving it somewhere common.
+    pub struct TestHandler();
+    impl ConnectionHandler for TestHandler {
+        type InEvent = ();
+        type OutEvent = ();
+        type Error = std::io::Error;
+        type Substream = Substream<StreamMuxerBox>;
+        type OutboundOpenInfo = ();
+
+        fn inject_substream(
+            &mut self,
+            _: Self::Substream,
+            _: SubstreamEndpoint<Self::OutboundOpenInfo>,
+        ) {
+        }
+
+        fn inject_event(&mut self, _: Self::InEvent) {}
+
+        fn inject_address_change(&mut self, _: &Multiaddr) {}
+
+        fn poll(
+            &mut self,
+            _: &mut Context<'_>,
+        ) -> Poll<Result<ConnectionHandlerEvent<Self::OutboundOpenInfo, Self::OutEvent>, Self::Error>>
+        {
+            Poll::Pending
+        }
+    }
+
+    #[test]
+    fn aborting_pending_connection_surfaces_error() {
+        let mut pool = Pool::new(
+            PeerId::random(),
+            PoolConfig::default(),
+            ConnectionLimits::default(),
+        );
+        let target_peer = PeerId::random();
+
+        pool.add_outgoing(
+            DummyTransport::default(),
+            ["/ip4/127.0.0.1/tcp/1234".parse::<Multiaddr>().unwrap()].into_iter(),
+            Some(target_peer),
+            TestHandler(),
+        )
+        .expect("Add outgoing should work");
+
+        // Disconnect from the peer, thus aborting all pending connections.
+        pool.disconnect(&target_peer);
+
+        // Poll the pool until the pending connection is aborted.
+        block_on(poll_fn(|cx| match pool.poll(cx) {
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(PoolEvent::PendingOutboundConnectionError {
+                error: PendingOutboundConnectionError::Aborted,
+                ..
+            }) => {
+                return Poll::Ready(());
+            }
+            Poll::Ready(_) => {
+                panic!("We should see an aborted error, nothing else.")
+            }
+        }));
     }
 }
