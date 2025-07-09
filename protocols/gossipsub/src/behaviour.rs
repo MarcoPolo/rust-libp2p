@@ -1558,7 +1558,12 @@ where
             "Received extensions message from peer"
         );
         if extensions.test_extension.unwrap_or(false) {
-            self.send_message(*peer_id, RpcOut::TestExtension);
+            let res = self.send_message(*peer_id, RpcOut::TestExtension);
+            tracing::debug!(
+                peer=%peer_id,
+                result=res,
+                "Sent test extension message to peer"
+            );
         }
     }
 
