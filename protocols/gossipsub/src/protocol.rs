@@ -43,6 +43,11 @@ use crate::{
 
 pub(crate) const SIGNING_PREFIX: &[u8] = b"libp2p-pubsub:";
 
+pub(crate) const GOSSIPSUB_1_3_0_PROTOCOL: ProtocolId = ProtocolId {
+    protocol: StreamProtocol::new("/meshsub/1.3.0"),
+    kind: PeerKind::Gossipsubv1_3,
+};
+
 pub(crate) const GOSSIPSUB_1_2_0_PROTOCOL: ProtocolId = ProtocolId {
     protocol: StreamProtocol::new("/meshsub/1.2.0"),
     kind: PeerKind::Gossipsubv1_2,
@@ -79,6 +84,7 @@ impl Default for ProtocolConfig {
         Self {
             validation_mode: ValidationMode::Strict,
             protocol_ids: vec![
+                GOSSIPSUB_1_3_0_PROTOCOL,
                 GOSSIPSUB_1_2_0_PROTOCOL,
                 GOSSIPSUB_1_1_0_PROTOCOL,
                 GOSSIPSUB_1_0_0_PROTOCOL,
