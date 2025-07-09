@@ -99,12 +99,13 @@ impl Sender {
                 &self.non_priority_sender
             }
         };
-        sender.try_send(rpc).map_err(|err| err.into_inner())
+        let v = sender.try_send(rpc).map_err(|err| err.into_inner());
         tracing::debug!(
             "after send queue sizes: priority={}, non_priority={}",
             self.priority_queue_len(),
             self.non_priority_queue_len()
         );
+        v
     }
 
     /// Returns the current size of the priority queue.
