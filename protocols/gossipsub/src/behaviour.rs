@@ -1552,6 +1552,11 @@ where
         }
 
         peer.extensions = Some(extensions);
+        tracing::debug!(
+            peer=%peer_id,
+            our_test_extension=extensions.test_extension.unwrap_or(false),
+            "Received extensions message from peer"
+        );
         if extensions.test_extension.unwrap_or(false) {
             self.send_message(*peer_id, RpcOut::TestExtension);
         }
