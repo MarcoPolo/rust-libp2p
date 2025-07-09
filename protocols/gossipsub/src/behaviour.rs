@@ -3435,7 +3435,7 @@ where
                 }
 
                 if let Some(result) = rpc.test_extension {
-                    tracing::debug!("Received Test Extension: {result}");
+                    tracing::debug!("Received Test Extension: {result:?}");
                 }
             }
         }

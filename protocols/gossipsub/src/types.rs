@@ -517,11 +517,14 @@ impl From<RpcOut> for proto::RPC {
                 subscriptions: vec![],
                 publish: vec![],
                 control: None,
-                testExtension: Some(true),
+                testExtension: Some(proto::TestExtension {}),
             },
         }
     }
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct TestExtension {}
 
 /// An RPC received/sent.
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -533,7 +536,7 @@ pub struct RpcIn {
     /// List of Gossipsub control messages.
     pub control_msgs: Vec<ControlAction>,
     /// Gossipsub test extension.
-    pub test_extension: Option<bool>,
+    pub test_extension: Option<TestExtension>,
 }
 
 impl fmt::Debug for RpcIn {
@@ -560,7 +563,7 @@ impl PeerKind {
             Self::Gossipsub => "Gossipsub v1.0",
             Self::Gossipsubv1_1 => "Gossipsub v1.1",
             Self::Gossipsubv1_2 => "Gossipsub v1.2",
-            Self::Gossipsubv1_3 => "Gossipsub v1.3",
+            Self::Gossipsubv1_3 => "Gossipsub v1.2",
         }
     }
 }
