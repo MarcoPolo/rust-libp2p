@@ -1512,6 +1512,10 @@ where
                 .map(|t| self.make_prune(t, peer_id, do_px, on_unsubscribe))
                 .collect::<Vec<_>>()
             {
+                tracing::debug!(
+                    topic=%prune.topic_hash,
+                    "sending prune"
+                );
                 self.send_message(*peer_id, RpcOut::Prune(prune));
             }
             // Send the prune messages to the peer
