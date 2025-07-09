@@ -91,7 +91,7 @@ impl Sender {
             | RpcOut::Unsubscribe(_) => {
                 tracing::debug!(
                     "Sending priority message: old_queue_len={}",
-                    self.priority_queue_len()
+                    &self.priority_sender.len()
                 );
                 &self.priority_sender
             }
