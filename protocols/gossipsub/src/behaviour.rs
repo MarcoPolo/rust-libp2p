@@ -3214,6 +3214,7 @@ where
                 rpc,
                 invalid_messages,
             } => {
+                tracing::debug!(topic=?rpc.control_msgs, "received message");
                 // Handle the gossipsub RPC
 
                 // Handle subscriptions
