@@ -101,6 +101,7 @@ impl Sender {
         };
         let v = sender.try_send(rpc).map_err(|err| err.into_inner());
         tracing::debug!(
+            res=?v,
             "after send queue sizes: priority={}, non_priority={}",
             self.priority_queue_len(),
             self.non_priority_queue_len()
