@@ -88,7 +88,13 @@ impl Sender {
             | RpcOut::Graft(_)
             | RpcOut::Prune(_)
             | RpcOut::Subscribe(_)
-            | RpcOut::Unsubscribe(_) => &self.priority_sender,
+            | RpcOut::Unsubscribe(_) => {
+                tracing::debug!(
+                    "Sending priority message: old_queue_len={}",
+                    self.priority_queue_len()
+                );
+                &self.priority_sender
+            }
             RpcOut::Forward { .. } | RpcOut::IHave(_) | RpcOut::IWant(_) | RpcOut::IDontWant(_) => {
                 &self.non_priority_sender
             }
